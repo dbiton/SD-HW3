@@ -2,6 +2,7 @@ package il.ac.technion.cs.softwaredesign
 
 import java.util.concurrent.CompletableFuture
 import com.google.inject.Inject
+import il.ac.technion.cs.softwaredesign.loan.LoanService
 
 /**
  * This is the main class implementing SifriTaub, the new book borrowing system.
@@ -25,10 +26,11 @@ class SifriTaub @Inject constructor(private val db: DB) {
      * @return An authentication token to be used in future calls.
      */
     fun authenticate(username: String, password: String): CompletableFuture<String> {
-        val data = db.getUserData(username)
-        if (data == null || data.password != password)
-            throw IllegalArgumentException()
-        return db.changeTokenForUser(data)
+        return db.getUserData(username).thenCompose {
+            if (it == null || it.password != password)
+                throw IllegalArgumentException()
+            db.changeTokenForUser(it)
+        }
     }
 
     /**
@@ -45,20 +47,28 @@ class SifriTaub @Inject constructor(private val db: DB) {
      * @throws IllegalArgumentException If a user with the same [username] already exists or the [age] is negative.
      */
     fun register(username: String, password: String, isFromCS: Boolean, age: Int): CompletableFuture<Unit> {
-        if (age < 0 || db.getUserData(username) != null)
+        if (age < 0)
             throw IllegalArgumentException()
-        db.addUser(username, isFromCS, age, password)
+        return db.getUserData(username).thenCompose {
+            if (it != null)
+                throw IllegalArgumentException()
+            db.addUser(username, isFromCS, age, password)
+        }
     }
 
-    private fun checkTokenValid(token: String) {
-        if (!db.isTokenValid(token))
-            throw PermissionException()
+    private fun checkTokenValid(token: String): CompletableFuture<Unit> {
+        return db.isTokenValid(token).thenApply {
+            if (!it)
+                throw PermissionException()
+        }
     }
 
-    private fun getUserfromUserData(data: UserData?): User? {
-        if (data == null)
-            return null
-        return User(data.username, data.isFromCS, data.age)
+    private fun getUserfromUserData(futureData: CompletableFuture<UserData?>): CompletableFuture<User?> {
+        return futureData.thenApply {
+            if (it == null)
+                return@thenApply null
+            User(it.username, it.isFromCS, it.age)
+        }
     }
 
     /**
@@ -75,8 +85,7 @@ class SifriTaub @Inject constructor(private val db: DB) {
      * return `null`, indicating that there is no such user
      */
     fun userInformation(token: String, username: String): CompletableFuture<User?> {
-        checkTokenValid(token)
-        return getUserfromUserData(db.getUserData(username))
+        return checkTokenValid(token).thenCompose { getUserfromUserData(db.getUserData(username)) }
     }
 
     /**
@@ -92,12 +101,16 @@ class SifriTaub @Inject constructor(private val db: DB) {
      * @throws PermissionException If the [token] is invalid.
      * @throws IllegalArgumentException If a book with the same [id] already exists.
      */
-    fun addBookToCatalog(token: String, id: String, description: String, copiesAmount: Int): CompletableFuture<Unit>  {
-        checkTokenValid(token)
-        if (db.getBookData(id) != null)
-            throw IllegalArgumentException()
-        val book = BookData(id, description, copiesAmount)
-        db.addBook(book) // in DB, add "token" for last book added
+    fun addBookToCatalog(token: String, id: String, description: String, copiesAmount: Int): CompletableFuture<Unit> {
+        return checkTokenValid(token).thenCompose {
+            db.getBookData(id).thenApply {
+                if (it != null)
+                    throw IllegalArgumentException()
+            }
+        }.thenCompose {
+            val book = BookData(id, description, copiesAmount)
+            db.addBook(book) // in DB, add "token" for last book added
+        }
     }
 
     /**
@@ -113,7 +126,7 @@ class SifriTaub @Inject constructor(private val db: DB) {
      */
     fun getBookDescription(token: String, id: String): CompletableFuture<String> {
         checkTokenValid(token)
-        return db.getBookData(id)?.description ?: throw IllegalArgumentException()
+        return db.getBookData(id).thenApply { data -> data?.description ?: throw IllegalArgumentException() }
     }
 
     /**
@@ -155,7 +168,8 @@ class SifriTaub @Inject constructor(private val db: DB) {
      * - Even when a loan is not yet obtained, it should still show up in the system, so that [loanRequestInformation] calls
      * succeed and view this loan request as queued.
      */
-    fun submitLoanRequest(token: String, loanName: String, bookIds: List<String>): CompletableFuture<String> = TODO("Implement me!")
+    fun submitLoanRequest(token: String, loanName: String, bookIds: List<String>): CompletableFuture<String> =
+        TODO("Implement me!")
 
     /**
      * Return information about a specific loan in the system. [id] is the loan id.
@@ -165,7 +179,8 @@ class SifriTaub @Inject constructor(private val db: DB) {
      * @throws PermissionException If the [token] is invalid.
      * @throws IllegalArgumentException If a loan with the supplied [id] does not exist in the system.
      */
-    fun loanRequestInformation(token: String, id: String): CompletableFuture<LoanRequestInformation> = TODO("Implement me!")
+    fun loanRequestInformation(token: String, id: String): CompletableFuture<LoanRequestInformation> =
+        TODO("Implement me!")
 
     /**
      * Cancel currently queued loan.
