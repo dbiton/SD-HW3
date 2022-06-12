@@ -62,7 +62,7 @@ class AggregatingStorageTests {
             assertDoesNotThrow {
                 s1.write(i, byteArrayOfInts(i%3))
                 val dataRead = s1.read(i)
-                assert(dataRead.contentEquals(byteArrayOfInts(i%3)))
+                assert(dataRead.get().contentEquals(byteArrayOfInts(i%3)))
             }
         }
     }
@@ -75,7 +75,7 @@ class AggregatingStorageTests {
                 dataWrite[0] = i.toByte()
                 s17.write(i, dataWrite)
                 val dataRead = s17.read(i)
-                assert(dataRead.contentEquals(dataWrite))
+                assert(dataRead.get().contentEquals(dataWrite))
             }
         }
     }

@@ -12,7 +12,7 @@ class FakeStorageTests {
 
     @BeforeAll
     fun init() {
-        db = FakeFactory().open("test".toByteArray())
+        db = FakeFactory().open("test".toByteArray()).get()
     }
 
     @Test
@@ -28,7 +28,7 @@ class FakeStorageTests {
     @Test
     fun `value read from db is right`() {
         db.write("test".toByteArray(), "value".toByteArray())
-        assert("value".toByteArray().contentEquals((db.read("test".toByteArray()))))
+        assert("value".toByteArray().contentEquals((db.read("test".toByteArray())).get()))
     }
 
 }

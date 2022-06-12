@@ -42,7 +42,7 @@ class UnboundedStorageTests {
             assertDoesNotThrow {
                 s.write(i.toString(), data.toByteArray())
                 val dataRead = s.read(i.toString())
-                assert(data.toByteArray().contentEquals(dataRead))
+                assert(data.toByteArray().contentEquals(dataRead.get()))
             }
         }
     }
